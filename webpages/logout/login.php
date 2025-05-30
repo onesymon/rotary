@@ -4,36 +4,12 @@ include_once($_SERVER['DOCUMENT_ROOT'] . '/rotary/includes/config.php');
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
-
-    if ($email === 'admin@gmail.com' && $password === 'admins') {
-        $_SESSION['role'] = '100';
-        $_SESSION['email'] = $email;
-        $_SESSION['fullname'] = 'Super Admin';
-        $_SESSION['user_id'] = 100;
-        $_SESSION['member_id'] = 100;
-        header('Location: /rotary/dashboard.php');
-        exit;
-    }
+ 
 
     if (isset($_POST['login'])) {
         if (empty($email) || empty($password)) {
             $error_message = "Email and password are required!";
-        } else {
-            $hashed_password = md5($password);
-            $sqlUser  = "SELECT * FROM users WHERE email = '$email' AND password = '$hashed_password'";
-            $resultUser  = $conn->query($sqlUser );
-
-            if ($resultUser  && $resultUser->num_rows === 1) {
-                $row = $resultUser->fetch_assoc();
-                $_SESSION['user_id'] = $row['id'];
-                $_SESSION['email'] = $row['email'];
-                $_SESSION['role'] = 'admin';
-                $_SESSION['fullname'] = $row['fullname'];
-                $_SESSION['photo'] = $row['photo'];
-                $_SESSION['member_id'] = null;
-                header("Location: /rotary/dashboard.php");
-                exit();
-            } else {
+        }  else {
                 $sqlMember = "SELECT * FROM members WHERE email = '$email'";
                 $resultMember = $conn->query($sqlMember);
 
@@ -54,8 +30,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $error_message = "Invalid email or password!";
             }
         }
-    }
-}
+    } 
 ?>
 
 <!DOCTYPE html>

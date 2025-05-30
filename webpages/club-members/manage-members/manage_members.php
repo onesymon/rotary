@@ -19,24 +19,23 @@ $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 // Build the SQL query based on filter
 $baseQuery = "SELECT members.*, club_position.position_name 
               FROM members 
-              LEFT JOIN club_position ON members.role = club_position.id";
+              LEFT JOIN club_position ON members.role = club_position.id
+              WHERE 1"; // ensures safe WHERE chaining
+
 
 // Prepare conditions for filter
-$whereConditions = [];
+$whereConditions = ["members.role != 100"]; // always exclude superadmin
 
 if ($filter === 'members') {
-    // Show only members with position_name = 'Member' (case insensitive)
     $whereConditions[] = "LOWER(club_position.position_name) = 'member'";
 } elseif ($filter === 'officers') {
-    // Show only officers: President, Secretary, Treasurer, Auditor
     $officerRoles = ["president", "secretary", "treasurer", "auditor"];
     $officerRolesIn = "'" . implode("','", $officerRoles) . "'";
     $whereConditions[] = "LOWER(club_position.position_name) IN ($officerRolesIn)";
 }
 
-// Append WHERE if needed
 if (count($whereConditions) > 0) {
-    $baseQuery .= " WHERE " . implode(" AND ", $whereConditions);
+    $baseQuery .= " AND " . implode(" AND ", $whereConditions);
 }
 
 $baseQuery .= " ORDER BY members.created_at ASC";

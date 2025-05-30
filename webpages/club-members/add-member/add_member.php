@@ -23,7 +23,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $address = $_POST['address'];
     $occupation = $_POST['occupation'];
     $password = $_POST['password'];
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
     $membershipNumber = 'CA-' . str_pad(mt_rand(1, 999999), 6, '0', STR_PAD_LEFT);
 
     $dobDate = new DateTime($dob);
@@ -32,13 +31,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if ($age < 18) {
         $response['message'] = 'You must be at least 18 years old.';
+    } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/', $password)) {
+        $response['message'] = 'Password must be at least 8 characters and include uppercase, lowercase, and a number.';
     } else {
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
         $uniquePhotoName = 'default.jpg';
+
         if (!empty($_FILES['photo']['name'])) {
             $uploadedPhoto = $_FILES['photo'];
             $uniquePhotoName = generateUniqueFileName($uploadedPhoto['name']);
             move_uploaded_file($uploadedPhoto['tmp_name'], 'uploads/member_photos/' . $uniquePhotoName);
         }
+// Check if email already exists
+$checkEmailQuery = "SELECT id FROM members WHERE email = ?";
+$stmt = $conn->prepare($checkEmailQuery);
+$stmt->bind_param("s", $email);
+$stmt->execute();
+$stmt->store_result();
+
+if ($stmt->num_rows > 0) {
+    $response['message'] = 'This email address is already registered. Please use a different one.';
+    $stmt->close();
+} else {
+    $stmt->close();
 
         $insertQuery = "INSERT INTO members (fullname, dob, gender, contact_number, email, address, occupation, membership_number, photo, password, created_at) 
                         VALUES ('$fullname', '$dob', '$gender', '$contactNumber', '$email', '$address', '$occupation',
@@ -52,153 +67,145 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
+}
 ?>
 
 <?php include('../../../includes/header.php'); ?>
-
 <body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed">
 <div class="wrapper">
-    <?php include('../../../includes/nav.php'); ?>
-    <?php include('../../../includes/sidebar.php'); ?>
+<?php include('../../../includes/nav.php'); ?>
+<?php include('../../../includes/sidebar.php'); ?>
+<div class="content-wrapper">
+<?php include('../../../includes/page_title.php'); ?>
+<section class="content">
+<div class="container-fluid">
+<div class="row">
+<div class="col-md-12">
 
-    <div class="content-wrapper">
-        <?php include('../../../includes/page_title.php'); ?>
+<?php if ($response['success']): ?>
+<div class="alert alert-success alert-dismissible">
+    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+    <h5><i class="icon fas fa-check"></i> Success</h5>
+    <?php echo $response['message']; ?>
+</div>
+<?php elseif (!empty($response['message'])): ?>
+<div class="alert alert-danger alert-dismissible">
+    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+    <h5><i class="icon fas fa-ban"></i> Error</h5>
+    <?php echo $response['message']; ?>
+</div>
+<?php endif; ?>
 
-        <section class="content">
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-md-12">
+<div id="clientValidationAlert" class="alert alert-danger alert-dismissible" style="display: none;">
+    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+    <h5><i class="icon fas fa-ban"></i> Error</h5>
+    <span id="clientValidationMessage"></span>
+</div>
 
-                        <?php if ($response['success']): ?>
-                            <div class="alert alert-success alert-dismissible">
-                                <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-                                <h5><i class="icon fas fa-check"></i> Success</h5>
-                                <?php echo $response['message']; ?>
-                            </div>
-                        <?php elseif (!empty($response['message'])): ?>
-                            <div class="alert alert-danger alert-dismissible">
-                                <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-                                <h5><i class="icon fas fa-ban"></i> Error</h5>
-                                <?php echo $response['message']; ?>
-                            </div>
-                        <?php endif; ?>
+<div class="card card-primary">
+<div class="card-header"><h3 class="card-title">Register New Club Member</h3></div>
+<form id="editProfileForm" method="post" action="" enctype="multipart/form-data">
+<div class="card-body">
 
-                        <!-- Client-side validation alert -->
-                        <div id="clientValidationAlert" class="alert alert-danger alert-dismissible" style="display: none;">
-                            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-                            <h5><i class="icon fas fa-ban"></i> Error</h5>
-                            <span id="clientValidationMessage"></span>
-                        </div>
+<!-- Personal Info -->
+<h5 class="text-primary"><i class="fas fa-id-card"></i> Personal Information</h5>
+<div class="form-group">
+    <label for="fullname">Full Name</label>
+    <input type="text" class="form-control" id="fullname" name="fullname" placeholder="e.g., Juan Dela Cruz" required>
+</div>
+<div class="form-group">
+    <label for="dob">Date of Birth</label>
+    <input type="date" class="form-control" id="dob" name="dob" required>
+</div>
+<div class="form-group">
+    <label for="gender">Gender</label>
+    <select class="form-control" id="gender" name="gender" required>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+    </select>
+</div>
 
-                        <div class="card card-primary">
-                            <div class="card-header">
-                                <h3 class="card-title">Register New Club Member</h3>
-                            </div>
+<hr>
 
-                            <form id="editProfileForm" method="post" action="" enctype="multipart/form-data">
-                                <div class="card-body">
+<!-- Contact Info -->
+<h5 class="text-primary"><i class="fas fa-phone-alt"></i> Contact Information</h5>
+<div class="form-group">
+    <label for="contactNumber">Contact Number</label>
+    <input type="tel" class="form-control" id="contactNumber" name="contactNumber" placeholder="e.g. 09123456789" pattern="^09\d{9}$" maxlength="11" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
+    <small class="form-text text-muted">Must start with 09 and be exactly 11 digits.</small>
+</div>
+<div class="form-group">
+    <label for="email">Email Address</label>
+    <input type="email" class="form-control" id="email" name="email" placeholder="e.g., juan@example.com" required>
+</div>
+<div class="form-group">
+    <label for="address">Address</label>
+    <input type="text" class="form-control" id="address" name="address" placeholder="e.g., 123 Main St" required>
+</div>
 
-                                <h5 class="text-primary"><i class="fas fa-id-card"></i> Personal Information</h5>
-                                    <div class="form-group">
-                                        <label for="fullname">Full Name</label>
-                                        <input type="text" class="form-control" id="fullname" name="fullname" placeholder="e.g., Juan Dela Cruz" required>
-                                    </div>
+<hr>
 
-                                    <div class="form-group">
-                                        <label for="dob">WDate of Birth</label>
-                                        <input type="date" class="form-control" id="dob" name="dob" required>
-                                    </div>
+<!-- Occupation & Photo -->
+<h5 class="text-primary"><i class="fas fa-briefcase"></i> Occupation & Photo</h5>
+<div class="form-group">
+    <label for="occupation">Occupation</label>
+    <input type="text" class="form-control" id="occupation" name="occupation" placeholder="e.g., Engineer" required>
+</div>
+<div class="form-group">
+    <label for="photo">Photo (optional)</label>
+    <input type="file" class="form-control" id="photo" name="photo">
+</div>
 
-                                    <div class="form-group">
-                                        <label for="gender">Select the member's gender</label>
-                                        <select class="form-control" id="gender" name="gender" required>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                    </div>
+<hr>
 
-                                     <hr>
-
-                                      <!-- CONTACT INFO -->
-                                    <h5 class="text-primary"><i class="fas fa-phone-alt"></i> Contact Information</h5>
-                                 
-                                    <div class="form-group">
-                                        <label for="contactNumber">Member’s Contact Number</label>
-                                        <input type="tel" 
-                                            class="form-control" 
-                                            id="contactNumber" 
-                                            name="contactNumber" 
-                                            placeholder="e.g. 09123456789" 
-                                            pattern="^09\d{9}$" 
-                                            maxlength="11" 
-                                            inputmode="numeric"
-                                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                                          
-                                            required>
-                                        <small class="form-text text-muted">Must start with 09 and be exactly 11 digits. Only numbers are allowed.</small>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="email">Email Address</label>
-                                        <input type="email" class="form-control" id="email" name="email" placeholder="e.g., juan@example.com" required>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="address">Where does the member live?</label>
-                                        <input type="text" class="form-control" id="address" name="address" placeholder="e.g., 123 Main St, Lipa City" required>
-                                    </div>
- <hr>
-
-                                    <!-- JOB + PHOTO -->
-                                    <h5 class="text-primary"><i class="fas fa-briefcase"></i> Occupation & Photo</h5>
-                       
-                                    <div class="form-group">
-                                        <label for="occupation">What is the member’s occupation?</label>
-                                        <input type="text" class="form-control" id="occupation" name="occupation" placeholder="e.g., Teacher, Engineer" required>
-                                    </div>
-
-                                    
-
-                                    <div class="form-group">
-                                        <label for="photo">Upload Member’s Photo (optional)</label>
-                                        <input type="file" class="form-control" id="photo" name="photo">
-                                    </div>
-  <hr>
-
-                                    <!-- PASSWORD SECTION -->
-                             <h5 class="text-primary"><i class="fas fa-briefcase"></i> Password</h5>
-                       <div class="form-group">
-                                        <label for="password">Set a password for the member</label>
-                                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter a secure password" required>
-                                    </div>
-                                </div>
-                                
-
-                                <div class="card-footer">
-                                    <button type="submit" class="btn btn-primary">Save Member</button>
-                                    <a href="/rotary/webpages/club-members/manage-members/manage_members.php" class="btn btn-success float-right">
-                                        <i class="fas fa-eye"></i> View Members
-                                    </a>
-                                </div>
-                            </form>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <footer class="main-footer">
-        <div class="float-right d-none d-sm-inline-block">
-            <b>Developed By</b> <a href="https://codeastro.com/">Group 9</a>
+<!-- PASSWORD SECTION -->
+<h5 class="text-primary"><i class="fas fa-lock"></i> Password</h5>
+<div class="form-group position-relative">
+    <label for="password">Set a password for the member</label>
+    <div class="input-group">
+        <input type="password" class="form-control" id="password" name="password" placeholder="Enter a secure password" required>
+        <div class="input-group-append">
+            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="#password">
+                <i class="fas fa-eye"></i>
+            </button>
         </div>
-    </footer>
+    </div>
+    <small class="form-text text-muted">At least 8 characters with uppercase, lowercase, and a number.</small>
+</div>
+
+<div class="form-group position-relative">
+    <label for="confirmPassword">Confirm password</label>
+    <div class="input-group">
+        <input type="password" class="form-control" id="confirmPassword" placeholder="Re-enter password" required>
+        <div class="input-group-append">
+            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="#confirmPassword">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<div class="card-footer">
+    <button type="submit" class="btn btn-primary">Save Member</button>
+    <a href="/rotary/webpages/club-members/manage-members/manage_members.php" class="btn btn-success float-right">
+        <i class="fas fa-eye"></i> View Members
+    </a>
+</div>
+</form>
+</div>
+
+</div></div></div></section></div>
+
+<footer class="main-footer">
+    <div class="float-right d-none d-sm-inline-block">
+        <b>Developed By</b> Group 9
+    </div>
+</footer>
 </div>
 
 <?php include('../../../includes/footer.php'); ?>
-
 <!-- Confirmation Modal -->
 <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-labelledby="confirmModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">
@@ -220,59 +227,100 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
   </div>
 </div>
 
-<!-- JavaScript Dependencies -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Custom Scripts -->
 <script>
-    function isAtLeast18YearsOld(dobValue) {
-        const dob = new Date(dobValue);
-        const today = new Date();
-        const age = today.getFullYear() - dob.getFullYear();
-        const month = today.getMonth() - dob.getMonth();
-        return (age > 18 || (age === 18 && (month > 0 || (month === 0 && today.getDate() >= dob.getDate()))));
-    }
+function isStrongPassword(password) {
+    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
+}
 
-    function showClientValidationError(message) {
-        $('#clientValidationMessage').text(message);
-        $('#clientValidationAlert').fadeIn();
-    }
+function isAtLeast18YearsOld(dobValue) {
+    const dob = new Date(dobValue);
+    const today = new Date();
+    const age = today.getFullYear() - dob.getFullYear();
+    const month = today.getMonth() - dob.getMonth();
+    return (age > 18 || (age === 18 && (month > 0 || (month === 0 && today.getDate() >= dob.getDate()))));
+}
 
-    $(document).ready(function () {
-        const form = $('#editProfileForm');
+function isValidEmail(email) {
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/i;
+    return emailPattern.test(email);
+}
 
-        form.on('submit', function (e) {
-            const dobValue = $('#dob').val();
-            const contact = $('#contactNumber').val();
-            const phoneRegex = /^09\d{9}$/;
+function showClientValidationError(message) {
+    $('#clientValidationMessage').text(message);
+    $('#clientValidationAlert').fadeIn();
+}
 
-            $('#clientValidationAlert').hide();
+$(document).ready(function () {
+    const form = $('#editProfileForm');
 
-            if (!isAtLeast18YearsOld(dobValue)) {
-                e.preventDefault();
-                showClientValidationError("You must be at least 18 years old.");
-                return;
-            }
+    form.on('submit', function (e) {
+        $('#clientValidationAlert').hide();
 
-            if (!phoneRegex.test(contact)) {
-                e.preventDefault();
-                showClientValidationError("Contact number must start with 09 and be exactly 11 digits.");
-                return;
-            }
+        const dobValue = $('#dob').val();
+        const contact = $('#contactNumber').val();
+        const email = $('#email').val();
+        const password = $('#password').val();
+        const confirmPassword = $('#confirmPassword').val();
 
-            if (!form.data('confirmed')) {
-                e.preventDefault();
-                $('#confirmModal').modal('show');
-            }
-        });
+        // Age validation
+        if (!isAtLeast18YearsOld(dobValue)) {
+            e.preventDefault();
+            showClientValidationError("You must be at least 18 years old.");
+            return;
+        }
 
-        $('#confirmSubmit').on('click', function () {
-            $('#confirmModal').modal('hide');
-            $('#editProfileForm').data('confirmed', true).submit();
-        });
+        // Contact number format
+        if (!/^09\d{9}$/.test(contact)) {
+            e.preventDefault();
+            showClientValidationError("Contact number must start with 09 and be exactly 11 digits.");
+            return;
+        }
+
+        // Email format
+        if (!isValidEmail(email)) {
+            e.preventDefault();
+            showClientValidationError("Please enter a valid email address.");
+            return;
+        }
+
+        // Password strength
+        if (!isStrongPassword(password)) {
+            e.preventDefault();
+            showClientValidationError("Password must be at least 8 characters and include uppercase, lowercase, and a number.");
+            return;
+        }
+
+        // Password match
+        if (password !== confirmPassword) {
+            e.preventDefault();
+            showClientValidationError("Passwords do not match.");
+            return;
+        }
+
+        // Show confirmation modal
+        if (!form.data('confirmed')) {
+            e.preventDefault();
+            $('#confirmModal').modal('show');
+        }
     });
+
+    $('#confirmSubmit').on('click', function () {
+        $('#confirmModal').modal('hide');
+        $('#editProfileForm').data('confirmed', true).submit();
+    });
+
+    // Toggle show/hide password
+    $('.toggle-password').on('click', function () {
+        const targetInput = $($(this).data('target'));
+        const icon = $(this).find('i');
+        const type = targetInput.attr('type') === 'password' ? 'text' : 'password';
+        targetInput.attr('type', type);
+        icon.toggleClass('fa-eye fa-eye-slash');
+    });
+});
 </script>
+
+
 
 </body>
 </html>
